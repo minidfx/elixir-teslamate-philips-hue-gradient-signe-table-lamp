@@ -1,0 +1,108 @@
+# Teslamate from MQTT
+
+```elixir
+Mix.install([
+  {:tortoise, "~> 0.10.0"},
+  {:kino, "~> 0.12.3"}
+])
+
+defmodule MqttHandler do
+  use Tortoise.Handler
+
+  require Logger
+
+  def handle_message(["teslamate", "cars", car_id, "power"], power, state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "state"], "charging", state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "state"], "asleep", state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "state "], "suspended", state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "location"], location, state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "geofence"], geofence, state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "plugged_in"], is_plugged, state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "charging_state "], "NoPower", state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "charging_state "], "Stopped", state) do
+    {:ok, state}
+  end
+
+  def handle_message(["teslamate", "cars", car_id, "charging_state "], "Charging", state) do
+    {:ok, state}
+  end
+end
+
+Kino.start_child!(
+  {Tortoise.Connection,
+   [
+     client_id: LiveBook,
+     server: {Tortoise.Transport.Tcp, host: "192.168.1.155", port: 1883},
+     handler: {Tortoise.Handler.Logger, []},
+     subscriptions: [{"teslamate/#", 0}]
+   ]}
+)
+```
+
+## States
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+stateDiagram-v2
+
+state "Home geofence detected" as Geofenced
+
+[*] --> Geofenced
+Geofenced --> Plugged
+
+Charging --> Charged
+Charging --> Completed
+Charging --> Stopped
+
+NoPower --> Charging
+Plugged --> Charging
+Charged --> Charging
+
+Completed --> Unplugged
+Charging --> Unplugged
+Charged --> Unplugged
+Plugged --> Unplugged
+NoPower --> Unplugged
+
+Charging --> usable_battery_level
+Charging --> battery_level
+
+usable_battery_level --> usable_battery_level
+usable_battery_level --> Charged
+usable_battery_level --> Completed
+
+battery_level --> battery_level
+battery_level --> Charged
+battery_level --> Completed
+
+Stopped --> NoPower
+Plugged --> NoPower
+
+Geofenced --> [*]
+Unplugged --> [*]
+```
