@@ -30,7 +30,11 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MixProject do
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
       {:tesla, "~> 1.9"},
-      {:tortoise, "~> 0.10.0"}
+      {:tortoise, "~> 0.10.0"},
+      {:jason, "~> 1.4"},
+      {:finch, "~> 0.18.0"},
+      {:recode, "~> 0.7", only: :dev},
+      {:mock, "~> 0.3.8", only: :test}
     ]
   end
 end
