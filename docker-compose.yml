@@ -1,0 +1,17 @@
+version: '3'
+services:
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: minidfx/teslamate-charging-status:0.1.0
+    environment:
+      - MQTT_HOST=<host>
+      - MQTT_PORT=<port>
+      - HUE_BRIDGE_HOST=<host>
+      - HUE_BRIDGE_APPLICATION_KEY=<key>
+      - HUE_LIGHT_ID=<id>
+      - CAR_ID=<id>
+      - GEOFENCE_HOME_NAME=<name>
+      - PUID=<id>
+      - PGID=<id>
