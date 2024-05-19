@@ -9,11 +9,6 @@ ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
 
 FROM elixir:${ELIXIR_VERSION} as builder
 
-RUN apt-get update -y && \
-    apt-get -y install curl && \
-    apt-get clean && \
-    rm -f /var/lib/apt/lists/*_*
-
 RUN mkdir /app
 
 WORKDIR /app
@@ -30,20 +25,21 @@ RUN mix deps.get --only $MIX_ENV
 RUN mkdir /app/config
 
 COPY config/config.exs config/${MIX_ENV}.exs config/runtime.exs /app/config/
-RUN mix deps.compile
-
 COPY lib/ /app/lib
 COPY rel/ /app/rel
 
-RUN mix compile && \
+RUN mix deps.compile && \
+    mix compile && \
     mix release
 
 ######################### Runner
 
 FROM ${RUNNER_IMAGE}
 
-RUN apt-get update && \
-    apt-get -y install tini && \
+RUN mkdir youtube-audio && \
+    mkdir youtube-video && \
+    apt-get update && \
+    apt-get -y install tini locales openssl && \
     apt-get clean && \
     rm -f /var/lib/apt/lists/*_*
 
@@ -66,4 +62,4 @@ COPY --chown=nobody:root startup.sh /app/startup.sh
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD ["/app/startup.sh"]%
+CMD ["/app/startup.sh"]
