@@ -29,7 +29,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: minidfx/teslamate-charging-status:0.1.0
+    image: minidfx/teslamate-charging-status:0.2.0
     environment:
       - MQTT_HOST=<host>
       - MQTT_PORT=<port>
