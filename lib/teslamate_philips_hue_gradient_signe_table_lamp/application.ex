@@ -52,7 +52,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.Application do
              :teslamate_philips_hue_gradient_signe_table_lamp,
              :mqtt_password
            ),
-         subscriptions: [{mqtt_topic, 0}]
+         subscriptions: [{mqtt_topic, 2}]
        ]}
     ]
 
