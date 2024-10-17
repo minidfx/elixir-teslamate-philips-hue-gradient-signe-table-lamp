@@ -1,8 +1,8 @@
 # Tesla Charging Status
 
-This project to notify anyone at **Home** that the car is charging or not. I created this project for my own usage because sometimes we left *Home* with almost an **empty battery**, the car was not plugged or the car was plugged but the charge was not started.
+This project notifies anyone at home whether the car is charging or not. I created this project for personal use because sometimes we would leave home with an almost empty battery; either the car wasn’t plugged in or the charge hadn’t started.
 
-*We don't have* a Tesla charger at Home, we are using a Zaptec charger, the car will not charge even whether the cable is plugged in. The charge has to be be started otherwise the light will stay in red.
+*We don’t have* a Tesla charger at home; we use a Zaptec charger. Even if the cable is plugged in, the car won’t charge unless the charging process is started, otherwise, the light will stay red.
 
 ## Pre-requisites
 
