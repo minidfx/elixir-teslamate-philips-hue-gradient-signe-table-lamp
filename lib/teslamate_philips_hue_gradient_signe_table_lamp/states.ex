@@ -5,6 +5,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   alias TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation
   alias TeslamatePhilipsHueGradientSigneTableLamp.HueBridgeClient
   alias TeslamatePhilipsHueGradientSigneTableLamp.Philips
+  alias TeslamatePhilipsHueGradientSigneTableLamp.ProcessFacade
   alias TeslamatePhilipsHueGradientSigneTableLamp.Queue
 
   require Logger
@@ -36,8 +37,6 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
   def start_link(%{log_level: level})
       when level in [:debug, :info, :warning, :error, :none] do
-    IO.inspect(level, label: "log level")
-
     GenServer.start_link(
       __MODULE__,
       initial_state(),
@@ -140,7 +139,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   def handle_cast(:home, %{is_home: false} = state) do
     Queue.publish_request(Philips.get_pending_status_request())
 
-    timer = Process.send_after(__MODULE__, :no_power, @default_timer_duration_ms)
+    timer = ProcessFacade.send_after(__MODULE__, :no_power, @default_timer_duration_ms)
 
     {:noreply,
      state
@@ -183,7 +182,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   def handle_cast(:plugged, %{is_plugged: false, is_home: true} = state) do
     Queue.publish_request(Philips.get_pending_status_request())
 
-    timer = Process.send_after(__MODULE__, :no_power, @default_timer_duration_ms)
+    timer = ProcessFacade.send_after(__MODULE__, :no_power, @default_timer_duration_ms)
 
     {:noreply,
      state
@@ -331,23 +330,20 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
   @impl true
   def handle_cast({:scheduled, datetime}, %{is_plugged: true, is_home: true} = state) do
-    when_verify_car_is_charging =
-      datetime
-      # Small time extension to let the timer to be cancelled by the charge started.
-      |> DateTime.add(1, :minute)
-      |> DateTime.diff(DateTime.utc_now(), :millisecond)
+    diff_before_scheduled =
+      DateTime.diff(datetime, DateTime.utc_now(), :millisecond)
 
     scheduling =
-      if when_verify_car_is_charging > 0 do
+      if diff_before_scheduled > 0 do
         Logger.debug("[State] Schedule a message to test whether the car is charging.")
 
         Queue.publish_request(Philips.get_pending_status_request())
 
         timer =
-          Process.send_after(
+          ProcessFacade.send_after(
             __MODULE__,
             :no_power,
-            when_verify_car_is_charging
+            diff_before_scheduled + 1 * 60 * 1000
           )
 
         {:ok, timer}
@@ -375,7 +371,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
   @impl true
   def handle_cast(message, %{state: :unknown} = state) do
-    Logger.info("[State] Any messages from unknown are ignored: #{message}")
+    Logger.info("[State] Any messages from unknown are ignored: #{inspect(message)}")
 
     {:noreply, state}
   end
@@ -402,7 +398,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   defp try_cancel_timer(%{timer: timer} = state) do
     %{state: s} = state
 
-    if Process.cancel_timer(timer) != false,
+    if ProcessFacade.cancel_timer(timer) != false,
       do:
         Logger.debug(
           "[State] Cancelled the timer of the geofence state to determine the charging status from #{s}."
