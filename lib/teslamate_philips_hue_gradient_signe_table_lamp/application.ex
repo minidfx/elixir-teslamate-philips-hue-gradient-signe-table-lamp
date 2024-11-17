@@ -32,11 +32,11 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.Application do
         TeslamatePhilipsHueGradientSigneTableLamp.States,
         %{log_level: Application.fetch_env!(:logger, :console) |> Keyword.fetch!(:level)}
       },
-      {Tortoise.Connection,
+      {Tortoise311.Connection,
        [
          client_id: :teslamate_philips_hue_gradient_signe_table_lamp,
          server:
-           {Tortoise.Transport.Tcp,
+           {Tortoise311.Transport.Tcp,
             host:
               Application.fetch_env!(:teslamate_philips_hue_gradient_signe_table_lamp, :mqtt_host),
             port:

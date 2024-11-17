@@ -1,5 +1,5 @@
 defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
-  use Tortoise.Handler
+  use Tortoise311.Handler
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.States
 
