@@ -1,10 +1,9 @@
 defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
   use GenServer
+  use TeslamatePhilipsHueGradientSigneTableLamp.Logger
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.Philips
   alias TeslamatePhilipsHueGradientSigneTableLamp.Queue
-
-  require Logger
 
   @default_latence 1000
 
@@ -17,14 +16,14 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
 
   @spec charging() :: :ok
   def charging() do
-    Logger.debug("[HueAnimation] Running charging animation ...")
+    Logger.debug("Running charging animation ...")
     GenServer.cast(__MODULE__, :clear)
     GenServer.cast(__MODULE__, :looping_charging)
   end
 
   @spec clear() :: :ok
   def clear() do
-    Logger.debug("[HueAnimation] Clearing any animation ...")
+    Logger.debug("Clearing any animation ...")
     GenServer.cast(__MODULE__, :clear)
   end
 
@@ -32,7 +31,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
 
   @impl true
   def init(args) do
-    Logger.debug("[HueAnimation] Initializing ...")
+    Logger.debug("Initializing ...")
     {:ok, args}
   end
 
@@ -41,7 +40,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
       when pixel_index < 4 do
     Queue.publish_request(Philips.get_charging_state_request(pixel_index + 1))
 
-    Logger.debug("[HueAnimation] Lopping charging animation, pixel #{pixel_index} ...")
+    Logger.debug("Lopping charging animation, pixel #{pixel_index} ...")
     Process.send_after(__MODULE__, :looping_charging, @default_latence)
 
     {:noreply, %{state | charging_pixel_index: pixel_index + 1}}
@@ -51,7 +50,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
   def handle_info(:looping_charging, %{charging_pixel_index: pixel_index} = state) do
     Queue.publish_request(Philips.get_charging_state_request(1))
 
-    Logger.debug("[HueAnimation] Lopping charging animation, pixel #{pixel_index} ...")
+    Logger.debug("Lopping charging animation, pixel #{pixel_index} ...")
     Process.send_after(__MODULE__, :looping_charging, @default_latence)
 
     {:noreply, %{state | charging_pixel_index: 1}}
@@ -59,13 +58,13 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
 
   @impl true
   def handle_info(:looping_charging, state) do
-    Logger.debug("[HueAnimation] Charging animation stopped.")
+    Logger.debug("Charging animation stopped.")
     {:noreply, state}
   end
 
   @impl true
   def handle_cast(:looping_charging, %{charging_pixel_index: _} = state) do
-    Logger.debug("[HueAnimation] Charging animation already started.")
+    Logger.debug("Charging animation already started.")
     {:noreply, state}
   end
 
@@ -73,7 +72,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
   def handle_cast(:looping_charging, state) do
     Queue.publish_request(Philips.get_charging_state_request(1))
 
-    Logger.debug("[HueAnimation] Lopping charging animation, pixel 1 ...")
+    Logger.debug("Lopping charging animation, pixel 1 ...")
     Process.send_after(__MODULE__, :looping_charging, @default_latence)
 
     {:noreply, Map.put(state, :charging_pixel_index, 1)}
@@ -81,7 +80,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
 
   @impl true
   def handle_cast(:clear, state) do
-    Logger.debug("[HueAnimation] Animation cleared.")
+    Logger.debug("Animation cleared.")
     {:noreply, Map.delete(state, :charging_pixel_index)}
   end
 end

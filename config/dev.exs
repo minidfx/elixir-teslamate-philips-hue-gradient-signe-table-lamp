@@ -1,9 +1,17 @@
 import Config
 
 config :logger, :console,
-  format: "[$level] $message $metadata\n",
-  metadata: [:mfa, :initial_call, :registered_name, :line],
+  format: {TeslamatePhilipsHueGradientSigneTableLamp.Logger, :format},
+  utc_log: true,
+  metadata: [:application, :module, :function, :line, :mfa],
   level: :debug
+
+config :logger,
+  compile_time_purge_matching: [
+    [application: :que],
+    [module: TeslamatePhilipsHueGradientSigneTableLamp.Handler],
+    [module: Tzdata.DataLoader]
+  ]
 
 config :teslamate_philips_hue_gradient_signe_table_lamp,
   mqtt_host: "<host>",

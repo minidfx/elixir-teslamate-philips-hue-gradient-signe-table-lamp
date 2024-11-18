@@ -1,5 +1,6 @@
 defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   use GenServer
+  use TeslamatePhilipsHueGradientSigneTableLamp.Logger
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.HttpRequest
   alias TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation
@@ -7,8 +8,6 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   alias TeslamatePhilipsHueGradientSigneTableLamp.Philips
   alias TeslamatePhilipsHueGradientSigneTableLamp.ProcessFacade
   alias TeslamatePhilipsHueGradientSigneTableLamp.Queue
-
-  require Logger
 
   @type state ::
           :unknown
@@ -86,16 +85,16 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
   @impl true
   def init(args) do
-    Logger.debug("[State] Initializing ...")
+    Logger.debug("Initializing ...")
 
     with {:ok, message} <- is_light_supported(),
          request <- Philips.get_unknown_state_request() do
-      Logger.info("[State] #{message}")
+      Logger.info(message)
       Queue.publish_request(request)
       {:ok, args}
     else
       {:error, reason} ->
-        Logger.error("[State] #{reason}")
+        Logger.error(reason)
         {:stop, "Cannot contact the HueBridge."}
     end
   end
@@ -115,9 +114,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
   @impl true
   def handle_info(message, %{state: car_state} = state) do
-    Logger.error(
-      "[State] Transition not supported: #{inspect(message)}, current state: #{car_state}"
-    )
+    Logger.error("Transition not supported: #{inspect(message)}, current state: #{car_state}")
 
     {:noreply, state}
   end
@@ -335,7 +332,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
     scheduling =
       if diff_before_scheduled > 0 do
-        Logger.debug("[State] Schedule a message to test whether the car is charging.")
+        Logger.debug("Schedule a message to test whether the car is charging.")
 
         Queue.publish_request(Philips.get_pending_status_request())
 
@@ -371,16 +368,14 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
   @impl true
   def handle_cast(message, %{state: :unknown} = state) do
-    Logger.info("[State] Any messages from unknown are ignored: #{inspect(message)}")
+    Logger.info("Any messages from unknown are ignored: #{inspect(message)}")
 
     {:noreply, state}
   end
 
   @impl true
   def handle_cast(message, %{state: car_state} = state) do
-    Logger.error(
-      "[State] Transition not supported: #{inspect(message)}, current state: #{car_state}"
-    )
+    Logger.error("Transition not supported: #{inspect(message)}, current state: #{car_state}")
 
     {:noreply, state}
   end
@@ -401,7 +396,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     if ProcessFacade.cancel_timer(timer) != false,
       do:
         Logger.debug(
-          "[State] Cancelled the timer of the geofence state to determine the charging status from #{s}."
+          "Cancelled the timer of the geofence state to determine the charging status from #{s}."
         )
 
     Map.delete(state, :timer)
@@ -421,6 +416,9 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     else
       %Tesla.Env{status: status} ->
         {:error, "An invalid HTTP status was received from the hue bridge: #{status}"}
+
+      error ->
+        {:error, "an unknown error occurred: #{inspect(error)}"}
     end
   end
 
@@ -442,10 +440,8 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
       |> Stream.each(fn result ->
         if match?({:error, _}, result) do
           {:error, reason} = result
-          Logger.info("[State] #{reason}")
+          Logger.info(reason)
         end
-
-        result
       end)
       |> Stream.filter(&match?({:ok, _}, &1))
       |> Stream.map(fn {:ok, x} -> x end)
@@ -456,7 +452,6 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     else
       [_] -> {:error, "More than 1 light matches the given environment variable HUE_LIGHT_ID."}
       [] -> {:error, "No light matches the given environment variable HUE_LIGHT_ID"}
-      :error -> {:error, "Make sure the environment variable HUE_LIGHT_ID was correctly set."}
     end
   end
 

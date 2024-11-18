@@ -1,9 +1,8 @@
 defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
   use Tortoise311.Handler
+  use TeslamatePhilipsHueGradientSigneTableLamp.Logger
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.States
-
-  require Logger
 
   # Callbacks
 
@@ -18,7 +17,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         nil,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} <nil>")
+    Logger.debug("#{Enum.join(topic_levels, "/")} <nil>")
     States.unknown()
 
     {:ok, state}
@@ -30,7 +29,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
 
     with {:ok, _} <- is_home_geofence(payload) do
       States.home_geofence_detected()
@@ -40,7 +39,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         {:ok, state}
 
       {:error, reason} ->
-        Logger.error("[MQTT] #{reason}")
+        Logger.error("#{reason}")
     end
 
     {:ok, state}
@@ -52,7 +51,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         "true" = payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     States.plugged()
 
     {:ok, state}
@@ -64,7 +63,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         "false" = payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     States.unplugged()
 
     {:ok, state}
@@ -76,7 +75,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         "Charging" = payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     States.charging()
 
     {:ok, state}
@@ -88,7 +87,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         "Stopped" = payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     States.stopped()
 
     {:ok, state}
@@ -100,7 +99,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         "Complete" = payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     States.complete()
 
     {:ok, state}
@@ -112,7 +111,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         "NoPower" = payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     States.no_power()
 
     {:ok, state}
@@ -125,7 +124,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         state
       )
       when not is_nil(payload) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
 
     with {:ok, scheduled_datetime, _} <- DateTime.from_iso8601(payload) do
       States.scheduled(scheduled_datetime)
@@ -142,7 +141,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
 
     with {level, _} <- Integer.parse(payload) do
       States.update_battery_level(level)
@@ -158,7 +157,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
         payload,
         state
       ) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
 
     with {level, _} <- Integer.parse(payload) do
       States.update_battery_level(level)
@@ -170,19 +169,19 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
 
   @impl true
   def handle_message(topic_levels, payload, state) do
-    Logger.debug("[MQTT] #{Enum.join(topic_levels, "/")} #{payload}")
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     {:ok, state}
   end
 
   @impl true
   def subscription(status, topic_filter, state) do
-    Logger.debug("[MQTT] #{inspect(status)}: #{topic_filter}")
+    Logger.debug("#{inspect(status)}: #{topic_filter}")
     {:ok, state}
   end
 
   @impl true
   def terminate(reason, _state) do
-    Logger.debug("[MQTT] Terminated because #{inspect(reason)}.")
+    Logger.debug("Terminated because #{inspect(reason)}.")
   end
 
   # Private

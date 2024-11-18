@@ -1,10 +1,9 @@
 defmodule TeslamatePhilipsHueGradientSigneTableLamp.Queue do
   use GenServer
+  use TeslamatePhilipsHueGradientSigneTableLamp.Logger
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.HttpRequest
   alias TeslamatePhilipsHueGradientSigneTableLamp.HueBridgeClient
-
-  require Logger
 
   # Client
 
@@ -17,7 +16,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.Queue do
   def publish_request(request) do
     case request do
       %HttpRequest{method: method} when method in [:put, :post] ->
-        Logger.debug("[Queue] Publishing a request to the hue bridge ...")
+        Logger.debug("Publishing a request to the hue bridge ...")
         GenServer.cast(__MODULE__, {:publish_request, request})
 
       _ ->
@@ -29,7 +28,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.Queue do
 
   @impl true
   def init(args) do
-    Logger.debug("[Queue] Initializing ...")
+    Logger.debug("Initializing ...")
 
     {:ok, args}
   end
@@ -40,13 +39,13 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.Queue do
 
     with {:ok, response} <- HueBridgeClient.put(u, b),
          %Tesla.Env{status: 200} <- response do
-      Logger.debug("[Queue] Request sent to the hue bridge.")
+      Logger.debug("Request sent to the hue bridge.")
     else
       %Tesla.Env{status: status} ->
-        Logger.error("[Queue] Invalid response received from the hue bridge: #{status}")
+        Logger.error("Invalid response received from the hue bridge: #{status}")
 
       {:error, reason} ->
-        Logger.error("[Queue] #{reason}")
+        Logger.error("#{reason}")
     end
 
     {:noreply, state}
