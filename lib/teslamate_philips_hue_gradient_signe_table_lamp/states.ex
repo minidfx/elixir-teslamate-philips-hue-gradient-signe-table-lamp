@@ -1,5 +1,6 @@
 defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   use GenServer
+  alias TeslamatePhilipsHueGradientSigneTableLamp.States
   use TeslamatePhilipsHueGradientSigneTableLamp.Logger
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.HttpRequest
@@ -18,8 +19,12 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
           | :stopped
           | :complete
           | :no_power
-          | :scheduled
-  @type server_state :: %{state: state(), is_plugged: boolean(), is_home: boolean()}
+  @type server_state :: %{
+          state: state(),
+          is_plugged: boolean(),
+          is_home: boolean(),
+          schedule: DateTime.t()
+        }
 
   @default_timer_duration_ms 5 * 60 * 1000
 
@@ -42,6 +47,10 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
       name: __MODULE__,
       debug: [logger_level_to_genserver_level(level)]
     )
+  end
+
+  def start_link(%{test: true}) do
+    GenServer.start_link(__MODULE__, Map.put(initial_state(), :test, true), name: __MODULE__)
   end
 
   @spec current_state() :: state()
@@ -77,11 +86,20 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   def scheduled(datetime) when is_struct(datetime, DateTime),
     do: GenServer.cast(__MODULE__, {:scheduled, datetime})
 
+  @spec scheduled(nil) :: :ok
+  def scheduled(nil),
+    do: GenServer.cast(__MODULE__, :clear_schedule)
+
   @spec update_battery_level(integer()) :: :ok
   def update_battery_level(level) when level in 0..100,
     do: GenServer.cast(__MODULE__, {:update_battery_level, level})
 
   # Callbacks
+
+  @impl true
+  def init(%{test: true} = args) do
+    {:ok, args}
+  end
 
   @impl true
   def init(args) do
@@ -133,7 +151,22 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   end
 
   @impl true
+  def handle_cast(:home, %{is_home: false, schedule: _} = state) do
+    Queue.publish_request(Philips.get_pending_status_request())
+
+    {:noreply,
+     state
+     |> try_cancel_timer()
+     |> Map.put(:state, :home)
+     |> Map.put(:is_home, true)}
+  end
+
+  @impl true
   def handle_cast(:home, %{is_home: false} = state) do
+    Logger.debug(
+      "Scheduling a timeout to make sure that the car is charging after #{@default_timer_duration_ms}"
+    )
+
     Queue.publish_request(Philips.get_pending_status_request())
 
     timer = ProcessFacade.send_after(__MODULE__, :no_power, @default_timer_duration_ms)
@@ -144,6 +177,11 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
      |> Map.put(:state, :home)
      |> Map.put(:timer, timer)
      |> Map.put(:is_home, true)}
+  end
+
+  @impl true
+  def handle_cast(:home, %{is_home: true} = state) do
+    {:noreply, state}
   end
 
   # NoPower
@@ -168,6 +206,44 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   # Plugged
 
   @impl true
+  def handle_cast(:plugged, %{is_home: true, state: :charging} = state) do
+    {:noreply, Map.put(state, :is_plugged, true)}
+  end
+
+  @impl true
+  def handle_cast(:plugged, %{is_plugged: false, is_home: true, schedule: schedule} = state) do
+    state =
+      with remaining_time_to_schedule <-
+             DateTime.diff(schedule, DateTime.utc_now(), :second),
+           :ok <- if(remaining_time_to_schedule > 0, do: :ok, else: :skip) do
+        Logger.debug("Schedule a message to test whether the car is charging.")
+
+        timer =
+          ProcessFacade.send_after(
+            __MODULE__,
+            :no_power,
+            (remaining_time_to_schedule + 10) * 1000
+          )
+
+        state
+        |> try_cancel_timer()
+        |> Map.put(:timer, timer)
+      else
+        _ ->
+          Logger.debug(
+            "Invalid schedule date, cannot schedule a timer in the past: #{inspect(schedule)}"
+          )
+
+          state
+      end
+
+    {:noreply,
+     state
+     |> Map.put(:state, :plugged)
+     |> Map.put(:is_plugged, true)}
+  end
+
+  @impl true
   def handle_cast(:plugged, %{is_plugged: false, is_home: true, timer: _} = state) do
     {:noreply,
      state
@@ -177,7 +253,9 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
   @impl true
   def handle_cast(:plugged, %{is_plugged: false, is_home: true} = state) do
-    Queue.publish_request(Philips.get_pending_status_request())
+    Logger.debug(
+      "Scheduling a timeout to make sure that the car is charging after #{@default_timer_duration_ms}"
+    )
 
     timer = ProcessFacade.send_after(__MODULE__, :no_power, @default_timer_duration_ms)
 
@@ -194,6 +272,11 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
      state
      |> Map.put(:state, :plugged)
      |> Map.put(:is_plugged, true)}
+  end
+
+  @impl true
+  def handle_cast(:plugged, %{is_plugged: true} = state) do
+    {:noreply, state}
   end
 
   # Unplugged
@@ -227,7 +310,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   # Charging
 
   @impl true
-  def handle_cast(:charging, %{is_plugged: true, is_home: true} = state) do
+  def handle_cast(:charging, %{is_home: true} = state) do
     HueAnimation.charging()
 
     {:noreply,
@@ -300,7 +383,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   # Update battery level
 
   @impl true
-  def handle_cast({:update_battery_level, level}, %{state: :complete} = state) do
+  def handle_cast({:update_battery_level, level}, %{is_home: true, state: :complete} = state) do
     level
     |> Philips.green_get_battery_state_request()
     |> Queue.publish_request()
@@ -309,7 +392,18 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   end
 
   @impl true
-  def handle_cast({:update_battery_level, level}, %{state: s} = state)
+  def handle_cast(
+        {:update_battery_level, level},
+        %{is_home: true, battery_level: current_level} = state
+      )
+      when level > current_level do
+    States.charging()
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:update_battery_level, level}, %{is_home: true, state: s} = state)
       when s in [:stopped, :unplugged] do
     level
     |> Philips.red_get_battery_state_request()
@@ -326,42 +420,20 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   # Scheduled
 
   @impl true
-  def handle_cast({:scheduled, datetime}, %{is_plugged: true, is_home: true} = state) do
-    diff_before_scheduled =
-      DateTime.diff(datetime, DateTime.utc_now(), :millisecond)
+  def handle_cast(:clear_schedule, state) do
+    Logger.debug("Clearing the charge scheduled ...")
 
-    scheduling =
-      if diff_before_scheduled > 0 do
-        Logger.debug("Schedule a message to test whether the car is charging.")
+    {:noreply,
+     state
+     |> try_cancel_timer()
+     |> Map.delete(:schedule)}
+  end
 
-        Queue.publish_request(Philips.get_pending_status_request())
+  @impl true
+  def handle_cast({:scheduled, datetime}, state) do
+    Logger.debug("Saving the charge scheduled #{inspect(datetime)} ...")
 
-        timer =
-          ProcessFacade.send_after(
-            __MODULE__,
-            :no_power,
-            diff_before_scheduled + 1 * 60 * 1000
-          )
-
-        {:ok, timer}
-      else
-        :skip
-      end
-
-    case scheduling do
-      {:ok, timer} ->
-        {:noreply,
-         state
-         |> try_cancel_timer()
-         |> Map.put(:state, :scheduled)
-         |> Map.put(:timer, timer)}
-
-      :skip ->
-        {:noreply,
-         state
-         |> try_cancel_timer()
-         |> Map.put(:state, :scheduled)}
-    end
+    {:noreply, Map.put(state, :schedule, datetime)}
   end
 
   # Fallback

@@ -5,8 +5,24 @@ Mix.install([
   {:kino, "~> 0.12.3"},
   {:tesla, "~> 1.9"},
   {:jason, "~> 1.4"},
-  {:finch, "~> 0.18.0"}
+  {:finch, "~> 0.18.0"},
+  {:timex, "~> 3.7"}
 ])
+
+Kino.start_child!(
+  {Finch,
+   name: LiveBookFinch,
+   pools: %{
+     default: [
+       conn_opts: [
+         transport_opts: [
+           verify: :verify_peer,
+           verify_fun: {fn _, _, state -> {:valid, state} end, []}
+         ]
+       ]
+     ]
+   }}
+)
 ```
 
 ## Modules
@@ -230,6 +246,31 @@ defmodule HttpClientV2 do
   plug(Tesla.Middleware.JSON)
 end
 
+defmodule HttpClientSSE do
+  use Tesla
+
+  adapter(Tesla.Adapter.Finch, name: LiveBookFinch)
+
+  plug(Tesla.Middleware.BaseUrl, "https://192.168.1.189/eventstream")
+  plug(Tesla.Middleware.Logger)
+
+  plug(Tesla.Middleware.Headers, [
+    {"hue-application-key", "LlAFoXtPKZfsc2fGBbeNVD2dYc5-5nbsjTAsmbV0"},
+    {"Content-Type", "application/json"},
+    {"Accept", "text/event-stream"}
+  ])
+
+  plug(Tesla.Middleware.JSON)
+  plug(Tesla.Middleware.SSE)
+
+  def read_events(urn) do
+    {:ok, env} = get(urn)
+    %Tesla.Env{body: stream} = env
+
+    Enum.each(stream, &IO.inspect/1)
+  end
+end
+
 # https://developers.meethue.com/develop/application-design-guidance/color-conversion-formulas-rgb-to-xy-and-back/
 defmodule Colors do
   def red() do
@@ -287,22 +328,27 @@ defmodule HttpClient do
     end
   )
 end
-
-Kino.start_child!(
-  {Finch,
-   name: LiveBookFinch,
-   pools: %{
-     default: [
-       conn_opts: [
-         transport_opts: [
-           verify: :verify_peer,
-           verify_fun: {fn _, _, state -> {:valid, state} end, []}
-         ]
-       ]
-     ]
-   }}
-)
 ```
+
+```elixir
+{:ok, env} = HttpClientV2.get("https://app-prod-ws.meteoswiss-app.ch/v1/plzDetail?plz=192000")
+%{body: body} = env
+%{"graph" => %{"sunrise" => sunrises, "sunset" => sunsets}} = body
+
+sunrise =
+  sunrises
+  |> Stream.map(&Timex.from_unix(&1, :millisecond))
+  |> Enum.min()
+
+sunset =
+  sunsets
+  |> Stream.map(&Timex.from_unix(&1, :millisecond))
+  |> Enum.min()
+
+{sunrise, sunset}
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
 
 ## Bridge authentication
 
@@ -325,15 +371,44 @@ HttpClientV2.get("/resource/device")
 |> then(&Helper.display_body/1)
 ```
 
+## Section
+
+```elixir
+HttpClientV2.get("/resource/scene")
+|> then(&Helper.display_body/1)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
 ## Get lamp configuration
 
 ```elixir
 lamp =
-  HttpClientV2.get("/resource/light/9703b59c-1675-4d45-a2f3-164f827d377b")
+  HttpClientV2.get("/resource/light/09644828-713b-421b-beb0-b9d016b4b860")
   |> then(&Helper.display_body/1)
 ```
 
-<!-- livebook:{"branch_parent_index":3} -->
+## Get devices having temperature sensor
+
+```elixir
+living_room =
+  HttpClientV2.get("/resource/temperature")
+  |> then(&Helper.display_body/1)
+```
+
+## Scenes
+
+```elixir
+  HttpClientV2.get("/resource/scene/542ac5be-cdb5-4f4d-aeab-584968d5b2b5")
+  |> then(&Helper.display_body/1)
+```
+
+```elixir
+ HttpClientV2.get("/resource/room")
+  |> then(&Helper.display_body/1)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
 
 ## Get current gradient points
 
@@ -365,6 +440,18 @@ HttpClientV2.put(
 |> then(&Helper.display_body/1)
 ```
 
+```elixir
+HttpClientV2.put(
+  "/resource/light/09644828-713b-421b-beb0-b9d016b4b860",
+  %{
+      "color" => %{
+        "xy" => %{"x" => 0.6488, "y" => 0.2876}
+      }
+    }
+)
+|> then(&Helper.display_body/1)
+```
+
 <!-- livebook:{"branch_parent_index":0} -->
 
 ## Set to 91% level
@@ -383,4 +470,41 @@ HttpClientV2.put(
   }
 )
 |> then(&Helper.display_body/1)
+```
+
+## Listening events
+
+https://developers.meethue.com/develop/hue-api-v2/core-concepts/#events
+
+```elixir
+defmodule MySSEClient do
+  use Tesla
+
+  plug(Tesla.Middleware.BaseUrl, "https://192.168.1.189/eventstream")
+
+  plug(Tesla.Middleware.Headers, [
+    {"hue-application-key", "LlAFoXtPKZfsc2fGBbeNVD2dYc5-5nbsjTAsmbV0"}
+  ])
+
+  plug(Tesla.Middleware.JSON, decode_content_types: ["text/event-stream"])
+
+  plug(Tesla.Middleware.SSE)
+
+  plug(Tesla.Middleware.Logger, debug: true)
+
+  plug(Tesla.Middleware.Timeout, timeout: 100_000_000)
+
+  adapter(Tesla.Adapter.Finch, name: LiveBookFinch)
+
+  def start_stream(endpoint) do
+    {:ok, %Tesla.Env{body: %Stream{} = stream}} =
+      get(endpoint, opts: [adapter: [response: :stream], receive_timeout: 24 * 60 * 1000])
+
+    stream
+    |> Stream.each(fn x -> IO.inspect(x) end)
+    |> Enum.to_list()
+  end
+end
+
+MySSEClient.start_stream("/clip/v2")
 ```
