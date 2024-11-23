@@ -3,6 +3,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
   use TeslamatePhilipsHueGradientSigneTableLamp.Logger
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.Philips
+  alias TeslamatePhilipsHueGradientSigneTableLamp.ProcessFacade
   alias TeslamatePhilipsHueGradientSigneTableLamp.Queue
 
   @default_latence 1000
@@ -41,7 +42,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
     Queue.publish_request(Philips.get_charging_state_request(pixel_index + 1))
 
     Logger.debug("Lopping charging animation, pixel #{pixel_index} ...")
-    Process.send_after(__MODULE__, :looping_charging, @default_latence)
+    ProcessFacade.send_after(__MODULE__, :looping_charging, @default_latence)
 
     {:noreply, %{state | charging_pixel_index: pixel_index + 1}}
   end
@@ -51,7 +52,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
     Queue.publish_request(Philips.get_charging_state_request(1))
 
     Logger.debug("Lopping charging animation, pixel #{pixel_index} ...")
-    Process.send_after(__MODULE__, :looping_charging, @default_latence)
+    ProcessFacade.send_after(__MODULE__, :looping_charging, @default_latence)
 
     {:noreply, %{state | charging_pixel_index: 1}}
   end
@@ -73,7 +74,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation do
     Queue.publish_request(Philips.get_charging_state_request(1))
 
     Logger.debug("Lopping charging animation, pixel 1 ...")
-    Process.send_after(__MODULE__, :looping_charging, @default_latence)
+    ProcessFacade.send_after(__MODULE__, :looping_charging, @default_latence)
 
     {:noreply, Map.put(state, :charging_pixel_index, 1)}
   end

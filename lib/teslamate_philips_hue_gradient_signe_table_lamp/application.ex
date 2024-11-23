@@ -37,10 +37,8 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.Application do
          client_id: :teslamate_philips_hue_gradient_signe_table_lamp,
          server:
            {Tortoise311.Transport.Tcp,
-            host:
-              Application.fetch_env!(:teslamate_philips_hue_gradient_signe_table_lamp, :mqtt_host),
-            port:
-              Application.fetch_env!(:teslamate_philips_hue_gradient_signe_table_lamp, :mqtt_port)},
+            host: Application.fetch_env!(:teslamate_philips_hue_gradient_signe_table_lamp, :mqtt_host),
+            port: Application.fetch_env!(:teslamate_philips_hue_gradient_signe_table_lamp, :mqtt_port)},
          handler: {TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler, []},
          user_name:
            Application.get_env(
