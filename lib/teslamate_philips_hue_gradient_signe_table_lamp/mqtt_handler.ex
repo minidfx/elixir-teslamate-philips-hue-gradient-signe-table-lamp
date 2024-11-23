@@ -168,6 +168,22 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MqttHandler do
   end
 
   @impl true
+  def handle_message(
+        ["teslamate", "cars", _, "charge_limit_soc"] = topic_levels,
+        payload,
+        state
+      ) do
+    Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
+
+    with {level, _} <- Integer.parse(payload) do
+      States.update_soc(level)
+      {:ok, state}
+    else
+      :error -> {:ok, state}
+    end
+  end
+
+  @impl true
   def handle_message(topic_levels, payload, state) do
     Logger.debug("#{Enum.join(topic_levels, "/")} #{payload}")
     {:ok, state}

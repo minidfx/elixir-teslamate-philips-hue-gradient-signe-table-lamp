@@ -70,25 +70,6 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.Philips do
     }
   end
 
-  @spec get_no_power_request() :: HttpRequest.t()
-  def get_no_power_request() do
-    light_id =
-      Application.fetch_env!(
-        :teslamate_philips_hue_gradient_signe_table_lamp,
-        :hue_signe_gradient_lamp_id
-      )
-
-    %HttpRequest{
-      method: :put,
-      url: "/resource/light/#{light_id}",
-      body: %{
-        gradient: %{
-          points: Enum.map(1..@count_pixels, fn _ -> red() end)
-        }
-      }
-    }
-  end
-
   @spec red_get_battery_state_request(integer()) :: HttpRequest.t()
   def red_get_battery_state_request(level) when level in 0..100,
     do: internal_get_battery_state_request(:red, level)

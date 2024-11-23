@@ -4,7 +4,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.MixProject do
   def project do
     [
       app: :teslamate_philips_hue_gradient_signe_table_lamp,
-      version: "0.8.1",
+      version: "0.8.2",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
