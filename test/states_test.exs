@@ -1,9 +1,8 @@
 defmodule StatesTest do
   use ExUnit.Case, async: false
+  use TeslamatePhilipsHueGradientSigneTableLamp.Logger
 
   import Mock
-
-  require Logger
 
   alias TeslamatePhilipsHueGradientSigneTableLamp.HueAnimation
   alias TeslamatePhilipsHueGradientSigneTableLamp.Philips
@@ -92,6 +91,7 @@ defmodule StatesTest do
       States.scheduled(~U"2024-01-01T10:00:00Z")
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
       States.stopped()
 
       # HACK: Waiting for the process state
@@ -101,6 +101,7 @@ defmodule StatesTest do
       assert_called_exactly(ProcessFacade.send_after(:_, :_, :_), 1)
       assert_called_exactly(ProcessFacade.send_after(:_, :no_power, 10 * 60 * 60 * 1000 + 10_000), 1)
       assert_called_exactly(Philips.get_pending_status_request(), 1)
+
       assert_not_called(Philips.red_get_battery_state_request(:_))
     end
   end
@@ -130,6 +131,7 @@ defmodule StatesTest do
       States.update_battery_level(71)
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
 
       # HACK: Waiting for the process state
       :sys.get_state(States)
@@ -138,6 +140,8 @@ defmodule StatesTest do
       assert_called_exactly(Philips.get_pending_status_request(), 1)
       assert_called_exactly(Philips.green_get_battery_state_request(:_), 1)
       assert_called_exactly(ProcessFacade.send_after(:_, :_, :_), 1)
+      assert_called_exactly(ProcessFacade.send_after(:_, :no_power, 5 * 60 * 1000), 1)
+
       assert_not_called(Philips.red_get_battery_state_request(:_))
     end
   end
@@ -167,6 +171,7 @@ defmodule StatesTest do
       States.update_battery_level(69)
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
 
       # HACK: Waiting for the process state
       :sys.get_state(States)
@@ -175,6 +180,7 @@ defmodule StatesTest do
       assert_called_exactly(Philips.get_pending_status_request(), 1)
       assert_called_exactly(ProcessFacade.send_after(:_, :_, :_), 1)
       assert_called_exactly(ProcessFacade.send_after(:_, :no_power, 5 * 60 * 1000), 1)
+
       assert_not_called(Philips.red_get_battery_state_request(:_))
       assert_not_called(Philips.green_get_battery_state_request(:_))
     end
@@ -199,6 +205,7 @@ defmodule StatesTest do
       States.scheduled(~U"2024-01-01T12:00:00Z")
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
       States.charging()
 
       # HACK: Waiting for the process state
@@ -273,6 +280,7 @@ defmodule StatesTest do
     ] do
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
       States.charging()
 
       # HACK: Waiting for the process state
@@ -359,6 +367,7 @@ defmodule StatesTest do
     ] do
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
       States.charging()
       States.complete()
 
@@ -421,6 +430,7 @@ defmodule StatesTest do
     ] do
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
       States.charging()
       States.complete()
       States.unknown()
@@ -464,7 +474,6 @@ defmodule StatesTest do
                if(&1 == nil, do: 0, else: &1)
              )
            )
-           |> tap(&Logger.debug("#{inspect(&1)}"))
          end,
          diff: fn a, b, c -> passthrough([a, b, c]) end,
          before?: fn a, b -> passthrough([a, b]) end
@@ -472,6 +481,7 @@ defmodule StatesTest do
     ] do
       States.scheduled(~U"2024-01-01T10:00:00Z")
       States.home_geofence_detected()
+      States.no_power()
       States.plugged()
       States.stopped()
       States.charging()
@@ -520,7 +530,6 @@ defmodule StatesTest do
                if(&1 == nil, do: 0, else: &1)
              )
            )
-           |> tap(&Logger.debug("#{inspect(&1)}"))
          end,
          diff: fn a, b, c -> passthrough([a, b, c]) end,
          before?: fn a, b -> passthrough([a, b]) end
@@ -529,6 +538,7 @@ defmodule StatesTest do
       States.scheduled(~U"2024-01-01T10:00:00Z")
       States.home_geofence_detected()
       States.plugged()
+      States.no_power()
       States.stopped()
       States.charging()
       States.stopped()
@@ -542,9 +552,66 @@ defmodule StatesTest do
       assert_called_exactly(ProcessFacade.cancel_timer(:_), 1)
       assert_called_exactly(Philips.get_pending_status_request(), 1)
       assert_called_exactly(Philips.red_get_battery_state_request(:_), 1)
-      assert_not_called(Philips.green_get_battery_state_request(:_))
       assert_called_exactly(HueAnimation.charging(), 1)
       assert_called_exactly(HueAnimation.clear(), 1)
+
+      assert_not_called(Philips.green_get_battery_state_request(:_))
+    end
+  end
+
+  test "handles car state transition from home, plugged in, stopped waiting for schedule, charging at scheduled time, and then no power while charging" do
+    with_mocks [
+      {Queue, [], [publish_request: fn _ -> :ok end]},
+      {ProcessFacade, [],
+       [
+         send_after: fn _, _, _ -> :ok end,
+         cancel_timer: fn _ -> :ok end
+       ]},
+      {Philips, [],
+       [
+         get_pending_status_request: fn -> :ok end,
+         green_get_battery_state_request: fn _ -> :ok end,
+         red_get_battery_state_request: fn _ -> :ok end,
+         get_unknown_state_request: fn -> :ok end
+       ]},
+      {HueAnimation, [], [charging: fn -> :ok end, clear: fn -> :ok end]},
+      {DateTime, [],
+       [
+         utc_now: fn ->
+           Process.get(:utc_calls_count, 0)
+           |> then(&Process.put(:utc_calls_count, &1 + 1))
+           |> then(
+             &Enum.at(
+               [~U"2024-01-01T00:00:00Z", ~U"2024-01-01T08:00:00Z", ~U"2024-01-01T10:15:00Z"],
+               if(&1 == nil, do: 0, else: &1)
+             )
+           )
+         end,
+         diff: fn a, b, c -> passthrough([a, b, c]) end,
+         before?: fn a, b -> passthrough([a, b]) end
+       ]}
+    ] do
+      States.scheduled(~U"2024-01-01T10:00:00Z")
+      States.home_geofence_detected()
+      States.plugged()
+      States.no_power()
+      States.stopped()
+      States.charging()
+      States.no_power()
+
+      # HACK: Waiting for the process state
+      :sys.get_state(States)
+
+      assert_called_exactly(Queue.publish_request(:_), 2)
+      assert_called_exactly(ProcessFacade.send_after(:_, :_, :_), 1)
+      assert_called_exactly(ProcessFacade.send_after(:_, :no_power, 10 * 60 * 60 * 1000 + 10_000), 1)
+      assert_called_exactly(ProcessFacade.cancel_timer(:_), 1)
+      assert_called_exactly(Philips.get_pending_status_request(), 1)
+      assert_called_exactly(Philips.red_get_battery_state_request(:_), 1)
+      assert_called_exactly(HueAnimation.charging(), 1)
+      assert_called_exactly(HueAnimation.clear(), 1)
+
+      assert_not_called(Philips.green_get_battery_state_request(:_))
     end
   end
 end

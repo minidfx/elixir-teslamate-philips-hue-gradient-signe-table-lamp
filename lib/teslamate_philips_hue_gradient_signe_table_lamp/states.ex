@@ -128,7 +128,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     {:noreply,
      state
      |> try_clear_timer()
-     |> try_publish_no_power()
+     |> publish_red_level()
      |> Map.put(:state, :no_power)}
   end
 
@@ -173,18 +173,36 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   # NoPower
 
   @impl true
-  def handle_cast(:no_power, %{state: s, timer: _, is_home: true} = state)
-      when s in [:home, :plugged, :charging, :stopped] do
+  def handle_cast(
+        :no_power,
+        %{
+          state: s,
+          is_home: true,
+          battery_level: b_level,
+          soc_level: s_level
+        } = state
+      )
+      when s in [:home, :plugged, :charging, :stopped] and
+             not is_nil(b_level) and
+             not is_nil(s_level) and
+             b_level >= s_level do
     {:noreply, Map.put(state, :state, :no_power)}
   end
 
   @impl true
   def handle_cast(:no_power, %{state: s, is_home: true} = state)
-      when s in [:home, :plugged, :charging, :stopped] do
+      when s in [:home, :plugged, :stopped] do
+    {:noreply, Map.put(state, :state, :no_power)}
+  end
+
+  @impl true
+  def handle_cast(:no_power, %{state: s, is_home: true} = state)
+      when s in [:charging] do
+    HueAnimation.clear()
+
     {:noreply,
      state
-     |> try_cancel_timer()
-     |> try_publish_no_power()
+     |> publish_red_level()
      |> Map.put(:state, :no_power)}
   end
 
@@ -238,7 +256,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     {:noreply,
      state
      |> try_cancel_timer()
-     |> try_publish_no_power()
+     |> publish_red_level()
      |> Map.put(:state, :unplugged)}
   end
 
@@ -267,7 +285,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
       {:noreply,
        state
-       |> try_publish_no_power()
+       |> publish_red_level()
        |> Map.put(:state, :stopped)}
     end
   end
@@ -278,7 +296,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
     {:noreply,
      state
-     |> try_publish_no_power()
+     |> publish_red_level()
      |> Map.put(:state, :stopped)}
   end
 
@@ -395,7 +413,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     state
   end
 
-  defp try_publish_no_power(%{battery_level: level} = state) do
+  defp publish_red_level(%{battery_level: level} = state) do
     level
     |> Philips.red_get_battery_state_request()
     |> Queue.publish_request()
@@ -403,7 +421,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     state
   end
 
-  defp try_publish_no_power(%{} = state) do
+  defp publish_red_level(%{} = state) do
     100
     |> Philips.red_get_battery_state_request()
     |> Queue.publish_request()
@@ -422,7 +440,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   defp try_schedule_no_power_trigger(%{schedule: schedule} = state, %DateTime{} = now) do
     with remaining_time_to_schedule <- DateTime.diff(schedule, now, :second),
          :ok <- if(remaining_time_to_schedule > 0, do: :ok, else: :skip) do
-      Logger.debug("Schedule a message to test whether the car is charging.")
+      Logger.debug("Schedule a timer at the schedule time #{schedule} to cast a :no_power message")
 
       timer =
         ProcessFacade.send_after(
@@ -445,6 +463,10 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   end
 
   defp try_schedule_no_power_trigger(state, _) do
+    Logger.debug(
+      "Schedule a timer in #{trunc(@default_timer_duration_ms / 1000 / 60)} minutes to cast :no_power message"
+    )
+
     timer = ProcessFacade.send_after(__MODULE__, :no_power, @default_timer_duration_ms)
 
     state
