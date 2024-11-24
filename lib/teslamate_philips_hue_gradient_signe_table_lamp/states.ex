@@ -285,7 +285,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   # Complete
 
   @impl true
-  def handle_cast(:complete, %{is_plugged: true, is_home: true} = state) do
+  def handle_cast(:complete, %{is_home: true} = state) do
     HueAnimation.clear()
 
     {:noreply,
