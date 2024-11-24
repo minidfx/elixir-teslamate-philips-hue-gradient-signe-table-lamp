@@ -290,6 +290,7 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
 
     {:noreply,
      state
+     |> try_cancel_timer()
      |> publish_green_level()
      |> Map.put(:state, :complete)}
   end
