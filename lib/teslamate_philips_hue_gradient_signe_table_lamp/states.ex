@@ -186,6 +186,8 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
              not is_nil(b_level) and
              not is_nil(s_level) and
              b_level >= s_level do
+    HueAnimation.clear()
+
     {:noreply, Map.put(state, :state, :no_power)}
   end
 
@@ -335,6 +337,11 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
     |> Philips.green_get_battery_state_request()
     |> Queue.publish_request()
 
+    {:noreply, Map.put(state, :battery_level, level)}
+  end
+
+  @impl true
+  def handle_cast({:update_battery_level, level}, %{timer: _} = state) do
     {:noreply, Map.put(state, :battery_level, level)}
   end
 

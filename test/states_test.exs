@@ -89,9 +89,11 @@ defmodule StatesTest do
        ]}
     ] do
       States.scheduled(~U"2024-01-01T10:00:00Z")
+      States.update_battery_level(57)
       States.home_geofence_detected()
       States.plugged()
       States.no_power()
+      States.update_battery_level(56)
       States.stopped()
 
       # HACK: Waiting for the process state
