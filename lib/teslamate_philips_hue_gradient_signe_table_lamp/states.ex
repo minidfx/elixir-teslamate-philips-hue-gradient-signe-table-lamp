@@ -277,6 +277,22 @@ defmodule TeslamatePhilipsHueGradientSigneTableLamp.States do
   # Stopped
 
   @impl true
+  def handle_cast(:stopped, %{is_plugged: true, is_home: true, schedule: schedule, state: :charging} = state) do
+    HueAnimation.clear()
+    now = DateTime.utc_now()
+
+    state =
+      if(DateTime.before?(now, schedule)) do
+        Queue.publish_request(Philips.get_pending_status_request())
+        state
+      else
+        publish_red_level(state)
+      end
+
+    {:noreply, Map.put(state, :state, :stopped)}
+  end
+
+  @impl true
   def handle_cast(:stopped, %{is_plugged: true, is_home: true, schedule: schedule} = state) do
     now = DateTime.utc_now()
 
