@@ -1,3 +1,9 @@
+# Notice
+
+⚠️ DON'T CLONE THIS REPO, DON'T USE IT, DON'T FORK IT because I created this small project before we knew **ELON** was **CRAZY**.
+
+-> https://futurism.com/the-byte/embarrassed-teslas-drivers-stickers
+
 # Tesla Charging Status
 
 This project notifies anyone at home whether the car is charging or not. I created this project for personal use because sometimes we would leave home with an almost empty battery; either the car wasn’t plugged in or the charge hadn’t started.
